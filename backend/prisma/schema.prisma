@@ -1,0 +1,79 @@
+generator client_py {
+  provider = "prisma-client-py"
+  interface = "asyncio"
+}
+
+datasource db {
+  provider     = "sqlite"
+  url          = env("DATABASE_URL")
+  relationMode = "prisma"
+}
+
+model Chat {
+  id              Int           @id @default(autoincrement())
+  name            String
+  watchedFolderId Int?
+  watchedFolder   WatchedFolder? @relation(fields: [watchedFolderId], references: [id])
+  messages        Message[]
+  llmProviderId   Int?
+  llmProvider     LLMProvider?   @relation(fields: [llmProviderId], references: [id])
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([watchedFolderId])
+  @@index([llmProviderId])
+}
+
+model LLMProvider {
+  id            Int      @id @default(autoincrement())
+  type          String // OpenAI, Claude, Ollama, Gemini
+  name          String
+  apiKey        String
+  apiUrl        String
+  embeddingType String
+  modelName     String
+  chats         Chat[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  watchedFolders WatchedFolder[]
+}
+
+model WatchedFolder {
+  id               Int      @id @default(autoincrement())
+  name             String
+  path             String
+  vectorDbFilename String
+  vectorDbLocation String
+  chats            Chat[]
+  files            File[]
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  folderHash       String // Hash of the folder content
+  llmProviderId   Int?
+  llmProvider     LLMProvider? @relation(fields: [llmProviderId], references: [id])
+  @@index([llmProviderId])
+}
+
+model File {
+  id              Int           @id @default(autoincrement())
+  name            String
+  relativePath    String
+  fileHash        String
+  watchedFolderId Int
+  watchedFolder   WatchedFolder @relation(fields: [watchedFolderId], references: [id], onDelete: Cascade)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@unique([watchedFolderId, relativePath]) // Each file path is unique within a given watched folder
+}
+
+model Message {
+  id        Int      @id @default(autoincrement())
+  text      String
+  sender    String // User or Assistant
+  createdAt DateTime @default(now())
+  chatId    Int
+  chat      Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  @@index([chatId])
+}
